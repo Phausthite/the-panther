@@ -1,101 +1,97 @@
-#define _WINSOCK_DEPRECATED_NO_WARNINGS//Ó¦¸ÃÊÇ½ûÖ¹API¾¯¸æ
-
-#include <WinSock2.h>//windows°æ<sys/socket.h>
-
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <WinSock2.h>
 #include <stdio.h>
-#include <stdlib.h>//ÄÚ´æ·ÖÅä/ÊÍ·Åº¯ÊıµÄÍ·ÎÄ¼ş£¨Standard Library£©
 
-#pragma comment(lib, "ws2_32.lib")//µ÷ÓÃ¿â"ws2_32.lib"
+#pragma comment(lib, "ws2_32.lib")
 
 void main()
 {
-    WSADATA wsaData;//ÓÃÓÚ´æ´¢WSAStartupº¯Êı·µ»ØµÄsocketÊı¾İ
-    int port;//¶Ë¿Ú
-    char Hello[] = "Hello,I'm a repeater.";
-    int Protocol=0;
-    char P ='N';
+    //åŠ è½½å¥—æ¥å­—
+    WSADATA wsaData;
+    char buff[1024];
+    memset(buff, 0, sizeof(buff));
 
-    printf("Customize port number:");
-    scanf_s("%d", &port);
-
-
-    printf("Will receiving UDP packets be supported?( input 'Y' or 'N' )\n");
-    scanf_s(" %c", &P,2);
-    if (P == 'Y') {
-        Protocol = 0; printf("Receiving UDP packets will be supported!\n");
-    }
-    else if(P == 'N') {
-        Protocol = IPPROTO_TCP; printf("Receiving UDP packets will not be supported!\n");
-    }
-
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)//µ÷ÓÃ2.2°æWinsock
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
     {
         printf("\nFailed to load Winsock:%d\n", WSAGetLastError());
         return;
     }
+
+    //è‡ªå®šä¹‰ç«¯å£
+    int port;
+    char ip_address_str[16] = { 0 };
+    printf("Customize port number:");
+    scanf_s("%d", &port);
     
-    //´´½¨ÓÃÓÚ¼àÌıµÄÌ×½Ó×Ö
-    SOCKET sockSrv = socket(AF_INET, SOCK_STREAM, Protocol);
-    if (SOCKET_ERROR == sockSrv) {
+    //è‡ªå®šä¹‰ipåœ°å€
+    printf("Customize send address:");
+    scanf_s("%s", &ip_address_str,16);
+    // å°†ç‚¹åˆ†åè¿›åˆ¶å­—ç¬¦ä¸²è½¬æ¢ä¸º in_addr ç»“æ„ä½“
+    struct in_addr ip_address;
+    ip_address.s_addr = inet_addr(ip_address_str);
+    if (ip_address.s_addr == INADDR_NONE) {
+        printf("\nInvalid IP address:%d\n", WSAGetLastError());
+        return;
+    }
+    
+    SOCKADDR_IN addrSrv;
+    addrSrv.sin_family = AF_INET;
+    addrSrv.sin_port = htons(port);
+    addrSrv.sin_addr.S_un.S_addr = ip_address.s_addr;
+
+    //åˆ›å»ºå¥—æ¥å­—
+    SOCKET sockClient = socket(AF_INET, SOCK_STREAM, 0);
+    if (SOCKET_ERROR == sockClient) {
         printf("\nSocket() error:%d\n", WSAGetLastError());
         return;
     }
 
-    SOCKADDR_IN addrSrv;//ipµØÖ·½á¹¹Ìå
-    addrSrv.sin_family = AF_INET;//Ğ­Òé×å
-    addrSrv.sin_port = htons(port); //¶Ë¿ÚºÅ
-    addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);//ipµØÖ·//htonº¯Êı°ÑÊı¾İ´ÓÖ÷»úĞò×ª»»³ÉÍøÂçĞò
-
-    //°ó¶¨Ì×½Ó×Ö
-    int retVal = bind(sockSrv, (LPSOCKADDR)&addrSrv, sizeof(SOCKADDR_IN));//°ÑÌØ¶¨µØÖ·¸³¸øsocket
-    if (retVal == SOCKET_ERROR) {
-        printf("\nBind failed:%d\n", WSAGetLastError());
+    //å‘æœåŠ¡å™¨å‘å‡ºè¿æ¥è¯·æ±‚
+    SOCKET sockConn = connect(sockClient, (struct  sockaddr*)&addrSrv, sizeof(addrSrv));
+    if (sockConn == INVALID_SOCKET) {
+        printf("\nConnect failed:%d\n", WSAGetLastError());
         return;
     }
-    if (listen(sockSrv, 10) == SOCKET_ERROR) {
-        printf("\nListen failed:%d\n", WSAGetLastError());
-        return;
+    //æ‰“æ‹›å‘¼
+    int iRec=recv(sockClient, buff, sizeof(buff), 0);
+    if (iRec != SOCKET_ERROR) {
+        printf("\nReceived message: %s\n", buff);
     }
+    
 
-    SOCKADDR_IN addrClient;//¿Í»§¶ËµØÖ·
-    int len = sizeof(SOCKADDR);
-    printf("\nWaiting...\n");
-
-    //µÈ´ı¿Í»§ÇëÇóµ½À´    
-    SOCKET sockConn = accept(sockSrv, (SOCKADDR*)&addrClient, &len);
-    if (sockConn == SOCKET_ERROR) {
-        printf("\nAccept failed:%d\n", WSAGetLastError());
-        return;
+    //è‡ªå®šä¹‰å‘é€åè®®
+    int Protocol = 0; char P;
+    printf("\nWhich protocol would you like to use for sending packets?(input 'T' (TCP) or 'U' (UDP) )\n");
+    scanf_s(" %c", &P, 2);
+    if (P == 'T') {
+        Protocol = 0; printf("TCP protocol will be used!\n");
     }
-
-    printf("\nConnection established!\nClient IP:[%s]\n", inet_ntoa(addrClient.sin_addr));
-
-    //´òÕĞºô
-    int iSend = send(sockConn, Hello, sizeof(Hello), Protocol);
-    if (iSend == SOCKET_ERROR) {
+    else if (P == 'U') {
+        Protocol = IPPROTO_UDP; printf("UDP protocol will be used!\n");
+    }
+    
+    //å‘é€æ•°æ®
+    char buffSend[1024];
+    printf("\nPlease input what you want to send:\n");
+    memset(buffSend, 0, sizeof(buffSend));
+    scanf_s("%s", buffSend, 1024);
+    const char* sendBuf = (const char*)buffSend;
+    int SndMsg = send(sockClient, sendBuf, sizeof(buffSend), Protocol);
+    if (SndMsg == SOCKET_ERROR) {
         printf("\nSend failed:%d\n", WSAGetLastError());
         return;
     }
-    
-    //½ÓÊÕÊı¾İ
-    char recvBuf[1024];
-    memset(recvBuf, 0, sizeof(recvBuf));
-    int rec=recv(sockConn, recvBuf, sizeof(recvBuf), Protocol);
-    if (rec != SOCKET_ERROR) {
-        printf("\nReceived message: %s\n", recvBuf);
-    }
-    
-    //¸´¶Á
-    int resp = send(sockConn, recvBuf, sizeof(recvBuf), Protocol);
-    if (resp == SOCKET_ERROR) {
-        printf("\nSend failed:%d\n", WSAGetLastError());
-        return;
-    }
-    
-    closesocket(sockConn);
 
-    closesocket(sockSrv);
+    //æ¥æ”¶æœåŠ¡å™¨å›åº”
+    char buffRecv[1024];
+    memset(buffRecv, 0, sizeof(buffRecv));
+    int Rev = recv(sockClient, buffRecv, sizeof(buffRecv), 0);
+    if (Rev != SOCKET_ERROR) {
+        printf("\nReceived message: %s\n", buffRecv);
+    }
+    
+    //å…³é—­å¥—æ¥å­—
+    closesocket(sockClient);
     WSACleanup();
     system("pause");
-
 }
