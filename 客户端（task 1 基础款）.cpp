@@ -75,8 +75,7 @@ void main()
     printf("\nPlease input what you want to send:\n");
     memset(buffSend, 0, sizeof(buffSend));
     scanf_s("%s", buffSend, 1024);
-    const char* sendBuf = (const char*)buffSend;
-    int SndMsg = send(sockClient, sendBuf, sizeof(buffSend), Protocol);
+    int SndMsg = sendto(sockClient, buffSend, sizeof(buffSend), 0, (struct sockaddr*)&addrSrv, sizeof(addrSrv));
     if (SndMsg == SOCKET_ERROR) {
         printf("\nSend failed:%d\n", WSAGetLastError());
         return;
